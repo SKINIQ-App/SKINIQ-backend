@@ -5,11 +5,43 @@ import numpy as np
 from PIL import Image
 import io
 import re
+import requests
+import os
+
+# URL for the hosted model file on GitHub Releases
+model_url = 'https://github.com/SKINIQ-App/SKINIQ-backend/releases/download/v1.0/cnn_skin_model.h5'
+model_path = 'Model/cnn_skin_model.h5'
+
+# Download the model file correctly using streaming
+if not os.path.exists(model_path):
+    try:
+        print("Model not found locally, downloading...")
+        
+        # Try a GET request with additional headers for clarity
+        headers = {"User-Agent": "python-requests/2.25.1"}
+        response = requests.get(model_url, stream=True, headers=headers)
+        response.raise_for_status()  # will raise HTTPError for bad responses
+        
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        
+        # Check if the file is being streamed correctly
+        with open(model_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        print("Model downloaded successfully!")
+    except requests.exceptions.HTTPError as e:
+        print(f"[ERROR] Failed to download model: {e.response.status_code} - {e.response.reason}")
+        print(f"[DEBUG] URL tried: {model_url}")
+        raise RuntimeError(f"Error downloading model: {str(e)}")
+    except Exception as e:
+        print(f"[ERROR] Unknown error during model download: {str(e)}")
+        raise RuntimeError(f"Error downloading model: {str(e)}")
 
 
 # Load ML Models
 try:
-    cnn_model = load_model("Model/cnn_skin_model.h5")
+    cnn_model = load_model(model_path)
     mlp_model = joblib.load("Model/mlp_model.pkl")
     tfidf_vectorizer = joblib.load("Model/tfidf_vectorizer.pkl")
     mlb_encoder = joblib.load("Model/mlb_encoder.pkl")
