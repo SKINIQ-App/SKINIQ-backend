@@ -12,27 +12,39 @@ def send_verification_email(email: str, otp: str):
     password = os.getenv("EMAIL_HOST_PASSWORD")
     receiver_email = email
 
-    subject = "Email Verification"
-    body = f"Your OTP for email verification is: {otp}"
+    subject = "Your SKINIQ Verification OTP"
+    body = f"""
+    Hi there 👋,
+
+    Your OTP for email verification is: **{otp}**
+
+    Please enter this in the app to verify your email.
+
+    Cheers,
+    SKINIQ Team
+    """
 
     message = MIMEMultipart()
     message["From"] = sender_email
     message["To"] = receiver_email
     message["Subject"] = subject
-    message.attach(MIMEText(body, "plain"))
+    message["Reply-To"] = sender_email
+    message.attach(MIMEText(body, "plain", "utf-8"))
 
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(sender_email, password)
-            server.sendmail(sender_email, receiver_email, message.as_string())
-            print(f"📨 Verification email sent to {receiver_email}")
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.set_debuglevel(1)  # 🔍 See email debug in Render logs
+        server.starttls()
+        server.login(sender_email, password)
+        server.sendmail(sender_email, receiver_email, message.as_string())
+        server.quit()
+        print(f"✅ Verification email sent to {receiver_email}")
     except Exception as e:
         print(f"❌ Error sending email: {e}")
 
-# ✅ Wrapper function for use in FastAPI route
+# ✅ Wrapper function for use in FastAPI
 def send_email_otp(email: str):
-    print(f"📩 Sending OTP to: {email}")  # Debug log
+    print(f"📩 Sending OTP to: {email}")
     otp = random.randint(100000, 999999)
     send_verification_email(email, str(otp))
-    # Optionally store the OTP in DB if you're verifying later
+    # You can store OTP in DB here if needed

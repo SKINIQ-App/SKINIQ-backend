@@ -91,10 +91,8 @@ def signup(user: UserCreate):
 
 @auth_router.post("/send-otp")
 async def send_otp(user: EmailSchema):
-    # Generate a random OTP (you can generate it however you prefer)
     otp = random.randint(100000, 999999)
     
-    # Store OTP in the user's data in the database (you might want to store the expiration time as well)
     existing_user = get_user_by_email(user.email)
     
     if existing_user:
@@ -102,10 +100,11 @@ async def send_otp(user: EmailSchema):
     else:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Send OTP via email
-    send_verification_email(user.email, otp)
+    # Use the send_email_otp function to send the OTP via email
+    send_email_otp(user.email)
     
     return {"message": "OTP sent"}
+
 
 @auth_router.post("/verify-otp")
 def verify_otp(email: str, otp: str):  # accept as string
