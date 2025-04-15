@@ -6,6 +6,9 @@ from cloudinary_utils import upload_image_to_cloudinary
 from mongo_utils import *
 from models import predict_skin_type, predict_skin_issues
 from models import generate_routine
+import random
+from your_email_module import send_verification_email 
+
 
 
 auth_router = APIRouter()
@@ -67,11 +70,35 @@ def forgot_password(data: ForgotPassword):
 def signup(user: UserCreate):
     if get_user_by_email(user.email):
         raise HTTPException(status_code=400, detail="Email already exists")
+    
     user_data = user.dict()
     user_data["password"] = bcrypt.hash(user.password)
-    user_data["email_verified"] = True
+    user_data["email_verified"] = False  # Set to False initially
+
+    # Generate a random OTP (you can generate it however you prefer)
+    otp = random.randint(100000, 999999)
+    user_data["otp"] = otp  # Save OTP to the database or use for verification
+    
     create_user(user_data)
-    return {"message": "Signup successful"}
+    
+    # Send OTP via email
+    send_verification_email(user.email, otp)
+    
+    return {"message": "Signup successful. OTP sent to email."}
+
+@auth_router.post("/verify-otp")
+def verify_otp(email: str, otp: str):  # accept as string
+    user = get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if str(user.get("otp")) != otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    update_user_by_email(email, {"email_verified": True})
+    return {"message": "Email verified successfully"}
+
+
 
 @auth_router.post("/upload-skin-photo/{username}")
 def upload_skin_photo(username: str, file: UploadFile = File(...)):

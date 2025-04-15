@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = MongoClient(os.getenv("MONGO_URL"))
+client = MongoClient(os.getenv("MONGODB_URL"))
 db = client["skincare"]
 
 users_collection = db["users"]
@@ -27,3 +27,11 @@ def store_skin_analysis(username, skin_type, skin_info, image_url=None, descript
         "description": description
     }
     return skin_analysis_collection.insert_one(doc)
+
+def update_user_by_email(email: str, update_data: dict):
+    user = get_user_by_email(email)
+    if user:
+        db.users.update_one({"email": email}, {"$set": update_data})
+        return True
+    else:
+        return False
