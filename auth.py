@@ -7,7 +7,7 @@ from mongo_utils import *
 from models import predict_skin_type, predict_skin_issues
 from models import generate_routine
 import random
-from your_email_module import send_verification_email 
+from your_email_module import send_verification_email, send_email_otp
 
 
 
@@ -39,6 +39,9 @@ class SkinDetails(BaseModel):
     skinConditionDiseases: List[str]
     skinBreakouts:str
     skinDescription: str
+
+class EmailSchema(BaseModel):
+    email: EmailStr
 
 # --- Routes ---
 
@@ -86,6 +89,24 @@ def signup(user: UserCreate):
     
     return {"message": "Signup successful. OTP sent to email."}
 
+@auth_router.post("/send-otp")
+async def send_otp(user: EmailSchema):
+    # Generate a random OTP (you can generate it however you prefer)
+    otp = random.randint(100000, 999999)
+    
+    # Store OTP in the user's data in the database (you might want to store the expiration time as well)
+    existing_user = get_user_by_email(user.email)
+    
+    if existing_user:
+        update_user_by_email(user.email, {"otp": otp})
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Send OTP via email
+    send_verification_email(user.email, otp)
+    
+    return {"message": "OTP sent"}
+
 @auth_router.post("/verify-otp")
 def verify_otp(email: str, otp: str):  # accept as string
     user = get_user_by_email(email)
@@ -97,8 +118,6 @@ def verify_otp(email: str, otp: str):  # accept as string
 
     update_user_by_email(email, {"email_verified": True})
     return {"message": "Email verified successfully"}
-
-
 
 @auth_router.post("/upload-skin-photo/{username}")
 def upload_skin_photo(username: str, file: UploadFile = File(...)):
