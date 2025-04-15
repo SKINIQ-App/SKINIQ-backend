@@ -8,7 +8,6 @@ __pycache__/
 
 # Models (if needed)
 *.h5
-!Model/cnn_skin_model.h5
 *.pkl
 *.joblib
 
