@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+passlib[bcrypt]
+python-jose
+pydantic
+email-validator
+tensorflow
+keras
+joblib
+pillow
+numpy
+pandas
+cloudinary
+pymongo
+dnspython
+scikit-learn

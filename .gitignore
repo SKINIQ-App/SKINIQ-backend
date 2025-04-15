@@ -1,0 +1,24 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.so
+
+# VS Code
+.vscode/
+
+# Models (if needed)
+*.h5
+*.pkl
+*.joblib
+
+# Environments
+venv/
+env/
+ENV/
+
+# Secrets
+.env
+
+# System junk
+.DS_Store
+Thumbs.db
