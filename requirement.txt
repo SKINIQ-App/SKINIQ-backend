@@ -14,3 +14,4 @@ cloudinary
 pymongo
 dnspython
 scikit-learn
+python-dotenv
