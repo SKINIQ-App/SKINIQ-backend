@@ -8,41 +8,48 @@ import re
 import requests
 import os
 
-# URL for the hosted model file on GitHub Releases
-model_url = 'https://github.com/SKINIQ-App/SKINIQ-backend/releases/download/v1.0/cnn_skin_model.h5'
-model_path = 'Model/cnn_skin_model.h5'
+# URLs for the hosted model files on GitHub Releases
+cnn_model_url = 'https://github.com/SKINIQ-App/SKINIQ-backend/releases/download/v1.0/cnn_skin_model.h5'
+mlp_model_url = 'https://github.com/SKINIQ-App/SKINIQ-backend/releases/download/v1.0/mlp_model.pkl'
 
-# Download the model file correctly using streaming
-if not os.path.exists(model_path):
-    try:
-        print("Model not found locally, downloading...")
-        
-        # Try a GET request with additional headers for clarity
-        headers = {"User-Agent": "python-requests/2.25.1"}
-        response = requests.get(model_url, stream=True, headers=headers)
-        response.raise_for_status()  # will raise HTTPError for bad responses
-        
-        os.makedirs(os.path.dirname(model_path), exist_ok=True)
-        
-        # Check if the file is being streamed correctly
-        with open(model_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-        print("Model downloaded successfully!")
-    except requests.exceptions.HTTPError as e:
-        print(f"[ERROR] Failed to download model: {e.response.status_code} - {e.response.reason}")
-        print(f"[DEBUG] URL tried: {model_url}")
-        raise RuntimeError(f"Error downloading model: {str(e)}")
-    except Exception as e:
-        print(f"[ERROR] Unknown error during model download: {str(e)}")
-        raise RuntimeError(f"Error downloading model: {str(e)}")
+# Paths to save models locally
+cnn_model_path = 'Model/cnn_skin_model.h5'
+mlp_model_path = 'Model/mlp_model.pkl'
 
+# Download the models if they don't exist locally
+def download_model(url, path):
+    if not os.path.exists(path):
+        try:
+            print(f"Downloading model from {url}...")
+            headers = {"User-Agent": "python-requests/2.25.1"}
+            response = requests.get(url, stream=True, headers=headers)
+            response.raise_for_status()  # will raise HTTPError for bad responses
+            
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            
+            # Check if the file is being streamed correctly
+            with open(path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            print(f"Model downloaded successfully to {path}!")
+        except requests.exceptions.HTTPError as e:
+            print(f"[ERROR] Failed to download model: {e.response.status_code} - {e.response.reason}")
+            print(f"[DEBUG] URL tried: {url}")
+            raise RuntimeError(f"Error downloading model: {str(e)}")
+        except Exception as e:
+            print(f"[ERROR] Unknown error during model download: {str(e)}")
+            raise RuntimeError(f"Error downloading model: {str(e)}")
+
+
+# Download CNN model and MLP model
+download_model(cnn_model_url, cnn_model_path)
+download_model(mlp_model_url, mlp_model_path)
 
 # Load ML Models
 try:
-    cnn_model = load_model(model_path)
-    mlp_model = joblib.load("Model/mlp_model.pkl")
+    cnn_model = load_model(cnn_model_path)
+    mlp_model = joblib.load(mlp_model_path)
     tfidf_vectorizer = joblib.load("Model/tfidf_vectorizer.pkl")
     mlb_encoder = joblib.load("Model/mlb_encoder.pkl")
 except Exception as e:
@@ -96,7 +103,7 @@ def predict_skin_issues(description: str):
         raise RuntimeError(f"Error predicting skin issues: {str(e)}")
 
 def generate_routine(skin_type: str, issues: list):
-    routines = []
+    routines = [] 
 
     # Skin-type specific routine
     if skin_type.lower() == "dry":
