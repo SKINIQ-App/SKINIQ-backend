@@ -69,7 +69,7 @@ def signup(user: UserCreate):
         raise HTTPException(status_code=400, detail="Email already exists")
     user_data = user.dict()
     user_data["password"] = bcrypt.hash(user.password)
-    user_data["email_verified"] = False
+    user_data["email_verified"] = True
     create_user(user_data)
     return {"message": "Signup successful"}
 
