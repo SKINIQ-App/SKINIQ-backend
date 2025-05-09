@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from auth import auth_router
 from skin_analysis import skin_router
@@ -7,6 +8,13 @@ from diary import diary_router  # Add this
 app = FastAPI()
 
 origins = ["*"]  # Replace with your frontend URL in production
+
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Serve HTML and assets from the static directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 app.add_middleware(
     CORSMiddleware,

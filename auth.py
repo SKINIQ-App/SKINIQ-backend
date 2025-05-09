@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+from jose import jwt
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
@@ -7,9 +9,10 @@ from mongo_utils import *
 from models import predict_skin_type, predict_skin_issues
 from models import generate_routine
 import random
-from your_email_module import send_verification_email, send_email_otp
+from your_email_module import send_verification_email, send_password_reset_email
 
-
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+JWT_EXPIRY_MINUTES = 30  # Link expires in 30 mins
 
 auth_router = APIRouter()
 
@@ -20,12 +23,20 @@ class UserCreate(BaseModel):
     password: str
     terms_accepted: bool
 
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
 class ForgotPassword(BaseModel):
     email: EmailStr
+    new_password: str
+
+class ResetPassword(BaseModel):
+    token: str
     new_password: str
 
 class UserProfileUpdate(BaseModel):
@@ -61,10 +72,53 @@ def login(user: UserLogin):
     return {"username": existing["username"], "email": existing["email"]}
 
 @auth_router.post("/forgot-password")
-def forgot_password(data: ForgotPassword):
+def forgot_password(data: EmailSchema):
     user = get_user_by_email(data.email)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Create JWT reset token
+    reset_token = jwt.encode(
+        {
+            "email": data.email,
+            "exp": datetime.utcnow() + timedelta(minutes=JWT_EXPIRY_MINUTES)
+        },
+        JWT_SECRET_KEY,
+        algorithm="HS256"
+    )
+
+    # Construct reset link
+    reset_link = f"https://skiniq-backend.onrender.com/static/reset_password.html?token={reset_token}"
+
+
+    # Send reset email
+    send_password_reset_email(data.email, user["username"], reset_link)
+
+    return {"message": "Reset password link sent to your email"}
+
+@auth_router.get("/static/reset_password.html", response_class=HTMLResponse)
+async def serve_reset_password_page():
+    try:
+        with open("static/reset_password.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Reset password page not found")
+
+
+@auth_router.post("/reset-password")
+def reset_password(data: ResetPassword):
+    try:
+        payload = jwt.decode(data.token, JWT_SECRET_KEY, algorithms=["HS256"])
+        email = payload.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Invalid token")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user = get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     hashed_pwd = bcrypt.hash(data.new_password)
     update_user_by_username(user["username"], {"password": hashed_pwd})
     return {"message": "Password reset successful"}
@@ -85,38 +139,38 @@ def signup(user: UserCreate):
     create_user(user_data)
     
     # Send OTP via email
-    send_verification_email(user.email, otp)
+    send_verification_email(user.email, otp, user.username)
     
     return {"message": "Signup successful. OTP sent to email."}
+
+@auth_router.post("/verify-otp")
+def verify_otp(data: VerifyOtpRequest):
+    user = get_user_by_email(data.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if str(user.get("otp")) != data.otp:
+        print(f"🔍 Stored OTP: {user.get('otp')} | Received OTP: {data.otp}")
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    update_user_by_email(data.email, {"email_verified": True})
+    return {"message": "Email verified successfully"}
 
 @auth_router.post("/send-otp")
 async def send_otp(user: EmailSchema):
     otp = random.randint(100000, 999999)
     
+    print(f"📩 Generated OTP {otp} for {user.email}")
+
     existing_user = get_user_by_email(user.email)
-    
+
     if existing_user:
         update_user_by_email(user.email, {"otp": otp})
+        send_verification_email(user.email, str(otp), existing_user["username"])
     else:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Use the send_email_otp function to send the OTP via email
-    send_email_otp(user.email)
-    
+
     return {"message": "OTP sent"}
-
-
-@auth_router.post("/verify-otp")
-def verify_otp(email: str, otp: str):  # accept as string
-    user = get_user_by_email(email)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if str(user.get("otp")) != otp:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-
-    update_user_by_email(email, {"email_verified": True})
-    return {"message": "Email verified successfully"}
 
 @auth_router.post("/upload-skin-photo/{username}")
 def upload_skin_photo(username: str, file: UploadFile = File(...)):
