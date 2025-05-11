@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 import logging
 import certifi
+import time
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -20,25 +21,37 @@ skin_analysis_collection = None
 def init_mongo():
     global client, db, users_collection, diary_collection, skin_analysis_collection
     if client is None:
-        try:
-            client = MongoClient(
-                os.getenv("MONGODB_URL"),
-                ssl=True,
-                tlsCAFile=certifi.where(),
-                tlsAllowInvalidCertificates=True,  # Temporary for testing
-                connectTimeoutMS=30000,
-                socketTimeoutMS=30000,
-                serverSelectionTimeoutMS=30000
-            )
-            db = client["skincare"]
-            db.command("ping")
-            users_collection = db["users"]
-            diary_collection = db["diary_entries"]
-            skin_analysis_collection = db["skin_analysis"]
-            logger.info("Successfully connected to MongoDB")
-        except Exception as e:
-            logger.error(f"Failed to connect to MongoDB: {e}")
-            raise
+        max_retries = 3
+        retry_delay = 5  # seconds
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Attempting to connect to MongoDB (Attempt {attempt + 1}/{max_retries})")
+                client = MongoClient(
+                    os.getenv("MONGODB_URL"),
+                    ssl=True,
+                    tlsCAFile=certifi.where(),
+                    tlsAllowInvalidCertificates=True,  # Temporary for testing
+                    connectTimeoutMS=30000,
+                    socketTimeoutMS=30000,
+                    serverSelectionTimeoutMS=30000
+                )
+                db = client["skincare"]
+                db.command("ping")
+                users_collection = db["users"]
+                diary_collection = db["diary_entries"]
+                skin_analysis_collection = db["skin_analysis"]
+                logger.info("Successfully connected to MongoDB")
+                return
+            except Exception as e:
+                logger.error(f"MongoDB connection failed: {e}")
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error("Max retries reached. Could not connect to MongoDB.")
+                    raise
+    else:
+        logger.info("MongoDB client already initialized")
 
 def create_user(user_data):
     init_mongo()
