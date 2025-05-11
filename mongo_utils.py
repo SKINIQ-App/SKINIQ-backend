@@ -9,19 +9,10 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Initialize MongoDB connection with SSL options
+# Initialize MongoDB connection
 try:
-    client = MongoClient(
-        os.getenv("MONGODB_URL"),
-        ssl=True,
-        tlsAllowInvalidCertificates=False,  # Set to True temporarily for testing
-        connectTimeoutMS=30000,  # 30 seconds
-        socketTimeoutMS=30000,   # 30 seconds
-        serverSelectionTimeoutMS=30000  # 30 seconds
-    )
+    client = MongoClient(os.getenv("MONGODB_URL"))
     db = client["skincare"]
-    # Test connection
-    db.command("ping")
     logger.info("Successfully connected to MongoDB")
 except Exception as e:
     logger.error(f"Failed to connect to MongoDB: {e}")
