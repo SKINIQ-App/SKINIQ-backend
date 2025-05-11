@@ -2,6 +2,7 @@ from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 import logging
+import certifi
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -9,20 +10,38 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Initialize MongoDB connection
-try:
-    client = MongoClient(os.getenv("MONGODB_URL"))
-    db = client["skincare"]
-    logger.info("Successfully connected to MongoDB")
-except Exception as e:
-    logger.error(f"Failed to connect to MongoDB: {e}")
-    raise
+# Global variables for lazy initialization
+client = None
+db = None
+users_collection = None
+diary_collection = None
+skin_analysis_collection = None
 
-users_collection = db["users"]
-diary_collection = db["diary_entries"]
-skin_analysis_collection = db["skin_analysis"]
+def init_mongo():
+    global client, db, users_collection, diary_collection, skin_analysis_collection
+    if client is None:
+        try:
+            client = MongoClient(
+                os.getenv("MONGODB_URL"),
+                ssl=True,
+                tlsCAFile=certifi.where(),
+                tlsAllowInvalidCertificates=True,  # Temporary for testing
+                connectTimeoutMS=30000,
+                socketTimeoutMS=30000,
+                serverSelectionTimeoutMS=30000
+            )
+            db = client["skincare"]
+            db.command("ping")
+            users_collection = db["users"]
+            diary_collection = db["diary_entries"]
+            skin_analysis_collection = db["skin_analysis"]
+            logger.info("Successfully connected to MongoDB")
+        except Exception as e:
+            logger.error(f"Failed to connect to MongoDB: {e}")
+            raise
 
 def create_user(user_data):
+    init_mongo()
     logger.info(f"Creating user: {user_data.get('email')}")
     try:
         result = users_collection.insert_one(user_data)
@@ -33,6 +52,7 @@ def create_user(user_data):
         raise
 
 def get_user_by_email(email):
+    init_mongo()
     logger.info(f"Fetching user by email: {email}")
     try:
         user = users_collection.find_one({"email": email})
@@ -46,6 +66,7 @@ def get_user_by_email(email):
         raise
 
 def get_user_by_username(username):
+    init_mongo()
     logger.info(f"Fetching user by username: {username}")
     try:
         user = users_collection.find_one({"username": username})
@@ -59,6 +80,7 @@ def get_user_by_username(username):
         raise
 
 def update_user_by_username(username, data):
+    init_mongo()
     logger.info(f"Updating user: {username}")
     try:
         result = users_collection.update_one({"username": username}, {"$set": data})
@@ -69,6 +91,7 @@ def update_user_by_username(username, data):
         raise
 
 def save_diary_entry(entry):
+    init_mongo()
     logger.info(f"Saving diary entry for {entry.get('username')}")
     try:
         result = diary_collection.insert_one(entry)
@@ -79,6 +102,7 @@ def save_diary_entry(entry):
         raise
 
 def get_user_diary_entries(username):
+    init_mongo()
     logger.info(f"Fetching diary entries for {username}")
     try:
         entries = list(diary_collection.find({"username": username}))
@@ -89,6 +113,7 @@ def get_user_diary_entries(username):
         raise
 
 def store_skin_analysis(username, skin_type, skin_info, image_url=None, description=None):
+    init_mongo()
     logger.info(f"Storing skin analysis for {username}")
     try:
         doc = {
@@ -106,6 +131,7 @@ def store_skin_analysis(username, skin_type, skin_info, image_url=None, descript
         raise
 
 def update_user_by_email(email: str, update_data: dict):
+    init_mongo()
     logger.info(f"Updating user by email: {email}")
     try:
         user = get_user_by_email(email)
@@ -120,4 +146,4 @@ def update_user_by_email(email: str, update_data: dict):
         logger.error(f"Failed to update user by email {email}: {e}")
         raise
 
-logger.info("MongoDB utilities initialized")
+logger.info("MongoDB utilities module loaded (lazy initialization)")
