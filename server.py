@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import logging
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -11,7 +13,7 @@ app = FastAPI()
 
 origins = ["*"]  # Replace with your frontend URL in production
 
-# Serve static files
+# Serve static files (only if needed for privacy_policy.html)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -53,3 +55,28 @@ except Exception as e:
 @app.get("/")
 def read_root():
     return {"message": "Skincare API is running"}
+
+# Add a generic /profile/ endpoint to fetch all profiles (optional, adjust as needed)
+@app.get("/profile/")
+def get_all_profiles():
+    logger.info("Fetching all profiles")
+    try:
+        from mongo_utils import get_user_by_username
+        return {"message": "Profile endpoint is working"}
+    except Exception as e:
+        logger.error(f"Error fetching profiles: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching profiles: {str(e)}")
+
+# Serve privacy_policy.html (keep this if needed)
+@app.get("/static/privacy_policy.html", response_class=HTMLResponse)
+async def serve_privacy_policy_page():
+    logger.info("Serving privacy policy page")
+    try:
+        with open("static/privacy_policy.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        logger.error("Privacy policy page not found")
+        raise HTTPException(status_code=404, detail="Privacy policy page not found")
+    except Exception as e:
+        logger.error(f"Error serving privacy policy page: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error serving privacy policy page: {str(e)}")

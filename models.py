@@ -1,6 +1,5 @@
 import joblib
 import tensorflow as tf
-from keras.models import load_model
 import numpy as np
 from PIL import Image
 import io
@@ -53,7 +52,7 @@ download_model(mlb_encoder_url, mlb_encoder_path)
 
 # Load ML Models
 try:
-    cnn_model = load_model(cnn_model_path)
+    cnn_model = tf.keras.models.load_model(cnn_model_path)  # Updated to use tf.keras
     mlp_model = joblib.load(mlp_model_path)
     tfidf_vectorizer = joblib.load(tfidf_vectorizer_path)
     mlb_encoder = joblib.load(mlb_encoder_path)
@@ -113,7 +112,7 @@ def generate_routine(skin_type: str, issues: list):
         routines.append("Use fragrance-free, calming skincare")
     elif skin_type.lower() == "normal":
         routines.append("Maintain gentle routine with SPF")
-    elif skin_type.lower() == "combinational":
+    elif skin_type.lower() == "combination":  # Fixed typo: "combinational" to "combination"
         routines.append("Balance hydration and exfoliation in different zones")
 
     issue_routines = {
@@ -139,7 +138,6 @@ def generate_routine(skin_type: str, issues: list):
         routines.append("Use gentle skincare and consult a dermatologist")
 
     return routines
-
 
 __all__ = ["cnn_model", "mlp_model", "tfidf_vectorizer", "mlb_encoder",
            "predict_skin_type", "predict_skin_issues", "generate_routine"]
