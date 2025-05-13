@@ -26,9 +26,10 @@ def init_mongo():
                 connection_string,
                 ssl=True,
                 tlsCAFile=certifi.where(),
-                connectTimeoutMS=20000,
-                socketTimeoutMS=20000,
-                serverSelectionTimeoutMS=20000
+                tlsAllowInvalidCertificates=True,  # Temporary workaround for SSL issues
+                connectTimeoutMS=30000,
+                socketTimeoutMS=30000,
+                serverSelectionTimeoutMS=30000
             )
             db = client["skincare"]
             db.command("ping")
