@@ -5,15 +5,13 @@ from fastapi.responses import HTMLResponse
 import logging
 import os
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-origins = ["*"]  # Replace with your frontend URL in production
+origins = ["*"]
 
-# Serve static files (only if needed for privacy_policy.html)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -24,7 +22,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Import routers with error handling
 try:
     from auth import auth_router
     app.include_router(auth_router)
@@ -45,7 +42,7 @@ except Exception as e:
 
 try:
     from diary import diary_router
-    app.include_router(diary_router)
+    app.include_router(diary_router, prefix="/diary")
     logger.info("Successfully included diary_router")
 except ImportError as e:
     logger.error(f"Failed to import diary_router: {e}")
@@ -56,7 +53,6 @@ except Exception as e:
 def read_root():
     return {"message": "Skincare API is running"}
 
-# Add a generic /profile/ endpoint to fetch all profiles (optional, adjust as needed)
 @app.get("/profile/")
 def get_all_profiles():
     logger.info("Fetching all profiles")
@@ -67,7 +63,6 @@ def get_all_profiles():
         logger.error(f"Error fetching profiles: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching profiles: {str(e)}")
 
-# Serve privacy_policy.html (keep this if needed)
 @app.get("/static/privacy_policy.html", response_class=HTMLResponse)
 async def serve_privacy_policy_page():
     logger.info("Serving privacy policy page")

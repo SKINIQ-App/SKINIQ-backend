@@ -1,37 +1,60 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from mongo_utils import save_diary_entry, get_user_diary_entries
-from cloudinary_utils import upload_image_to_cloudinary
-from datetime import datetime
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException
+from typing import List
 import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from datetime import datetime
+from cloudinary_utils import upload_image_to_cloudinary
+from mongo_utils import get_user_by_username, update_user_by_username
 
 diary_router = APIRouter()
+logger = logging.getLogger(__name__)
 
-@diary_router.post("/diary_entry")  # Changed from /diary/upload to /diary_entry to match frontend
-async def upload_diary(username: str = Form(...), description: str = Form(None), file: UploadFile = File(None)):
+@diary_router.post("/diary_entry")
+async def create_diary_entry(
+    username: str = Form(...),
+    date: str = Form(...),
+    text: str = Form(...),
+    file: List[UploadFile] = File(...),
+):
     try:
-        image_url = upload_image_to_cloudinary(file.file) if file else None
-        entry = {
-            "username": username,
-            "description": description,
-            "image_url": image_url,
-            "date": datetime.now().isoformat()
+        user = get_user_by_username(username)
+        if not user:
+            logger.warning(f"User not found: {username}")
+            raise HTTPException(status_code=404, detail="User not found")
+
+        photo_urls = []
+        for photo in file:
+            photo_url = upload_image_to_cloudinary(photo.file, filename=photo.filename)
+            photo_urls.append(photo_url)
+
+        diary_entry = {
+            "date": date,
+            "text": text,
+            "photos": photo_urls,
+            "created_at": datetime.utcnow().isoformat(),
         }
-        save_diary_entry(entry)
-        logger.info(f"Diary entry uploaded for {username}")
-        return {"message": "Diary entry uploaded"}
-    except Exception as e:
-        logger.error(f"Diary entry upload failed for {username}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Diary entry upload failed: {str(e)}")
 
-@diary_router.get("/diary/{username}")
-def get_diary_entries(username: str):
+        if "diary_entries" not in user:
+            user["diary_entries"] = []
+        user["diary_entries"].append(diary_entry)
+
+        update_user_by_username(username, {"diary_entries": user["diary_entries"]})
+        logger.info(f"Diary entry created for {username} on {date}")
+        return {"message": "Diary entry created successfully"}
+    except Exception as e:
+        logger.error(f"Failed to create diary entry for {username}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create diary entry: {str(e)}")
+
+@diary_router.get("/diary/entries/{username}")
+async def get_diary_entries(username: str):
     try:
-        entries = get_user_diary_entries(username)
+        user = get_user_by_username(username)
+        if not user:
+            logger.warning(f"User not found: {username}")
+            raise HTTPException(status_code=404, detail="User not found")
+
+        diary_entries = user.get("diary_entries", [])
         logger.info(f"Fetched diary entries for {username}")
-        return {"entries": entries}
+        return {"diary_entries": diary_entries}
     except Exception as e:
         logger.error(f"Failed to fetch diary entries for {username}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch diary entries: {str(e)}")
