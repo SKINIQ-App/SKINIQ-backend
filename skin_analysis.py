@@ -59,7 +59,6 @@ async def analyze_skin(username: str, file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Skin analysis failed for {username}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Skin analysis failed: {str(e)}")
-
 @skin_router.post("/questionnaire")
 async def process_questionnaire(details: SkinDetails):
     try:
