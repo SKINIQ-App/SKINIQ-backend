@@ -3,15 +3,12 @@ import os
 from dotenv import load_dotenv
 import logging
 import certifi
-import time
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Global variables for lazy initialization
 client = None
 db = None
 users_collection = None
@@ -21,113 +18,100 @@ skin_analysis_collection = None
 def init_mongo():
     global client, db, users_collection, diary_collection, skin_analysis_collection
     if client is None:
-        max_retries = 3
-        retry_delay = 5  # seconds
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Attempting to connect to MongoDB (Attempt {attempt + 1}/{max_retries})")
-                client = MongoClient(
-                    os.getenv("MONGODB_URL"),
-                    ssl=True,
-                    tlsCAFile=certifi.where(),
-                    tlsAllowInvalidCertificates=True,  # Temporary for testing
-                    connectTimeoutMS=30000,
-                    socketTimeoutMS=30000,
-                    serverSelectionTimeoutMS=30000
-                )
-                db = client["skincare"]
-                db.command("ping")
-                users_collection = db["users"]
-                diary_collection = db["diary_entries"]
-                skin_analysis_collection = db["skin_analysis"]
-                logger.info("Successfully connected to MongoDB")
-                return
-            except Exception as e:
-                logger.error(f"MongoDB connection failed: {e}")
-                if attempt < max_retries - 1:
-                    logger.info(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                else:
-                    logger.error("Max retries reached. Could not connect to MongoDB.")
-                    raise
-    else:
-        logger.info("MongoDB client already initialized")
+        try:
+            connection_string = os.getenv("MONGODB_URL")
+            if not connection_string:
+                raise Exception("MONGODB_URL not set in environment")
+            client = MongoClient(
+                connection_string,
+                ssl=True,
+                tlsCAFile=certifi.where(),
+                connectTimeoutMS=20000,
+                socketTimeoutMS=20000,
+                serverSelectionTimeoutMS=20000
+            )
+            db = client["skincare"]
+            db.command("ping")
+            users_collection = db["users"]
+            diary_collection = db["diary_entries"]
+            skin_analysis_collection = db["skin_analysis"]
+            logger.info("Connected to MongoDB")
+            return True
+        except Exception as e:
+            logger.error(f"MongoDB connection failed: {e}")
+            client = None
+            raise Exception("Failed to connect to MongoDB")
+    return True
 
 def create_user(user_data):
-    init_mongo()
-    logger.info(f"Creating user: {user_data.get('email')}")
+    if not init_mongo():
+        raise Exception("Failed to connect to MongoDB")
     try:
         result = users_collection.insert_one(user_data)
-        logger.info(f"User created: {user_data.get('email')}, ID: {result.inserted_id}")
+        logger.info(f"User created: {user_data.get('email')}")
         return result
     except Exception as e:
         logger.error(f"Failed to create user {user_data.get('email')}: {e}")
         raise
 
 def get_user_by_email(email):
-    init_mongo()
-    logger.info(f"Fetching user by email: {email}")
+    if not init_mongo():
+        raise Exception("Failed to connect to MongoDB")
     try:
         user = users_collection.find_one({"email": email})
-        if user:
-            logger.info(f"User found: {email}")
-        else:
-            logger.info(f"No user found for email: {email}")
+        logger.info(f"User fetch attempted for: {email}")
         return user
     except Exception as e:
         logger.error(f"Failed to fetch user by email {email}: {e}")
         raise
 
 def get_user_by_username(username):
-    init_mongo()
-    logger.info(f"Fetching user by username: {username}")
+    if not init_mongo():
+        raise Exception("Failed to connect to MongoDB")
     try:
         user = users_collection.find_one({"username": username})
-        if user:
-            logger.info(f"User found: {username}")
-        else:
-            logger.info(f"No user found for username: {username}")
+        logger.info(f"User fetch attempted for: {username}")
         return user
     except Exception as e:
         logger.error(f"Failed to fetch user by username {username}: {e}")
         raise
 
 def update_user_by_username(username, data):
-    init_mongo()
-    logger.info(f"Updating user: {username}")
+    if not init_mongo():
+        raise Exception("Failed to connect to MongoDB")
     try:
         result = users_collection.update_one({"username": username}, {"$set": data})
-        logger.info(f"User updated: {username}, matched: {result.matched_count}, modified: {result.modified_count}")
+        logger.info(f"User updated: {username}")
         return result
     except Exception as e:
         logger.error(f"Failed to update user {username}: {e}")
         raise
 
 def save_diary_entry(entry):
-    init_mongo()
-    logger.info(f"Saving diary entry for {entry.get('username')}")
+    if not init_mongo():
+        raise Exception("Failed to connect to MongoDB")
     try:
         result = diary_collection.insert_one(entry)
-        logger.info(f"Diary entry saved for {entry.get('username')}, ID: {result.inserted_id}")
+        logger.info(f"Diary entry saved for {entry.get('username')}")
         return result
     except Exception as e:
         logger.error(f"Failed to save diary entry for {entry.get('username')}: {e}")
         raise
 
 def get_user_diary_entries(username):
-    init_mongo()
-    logger.info(f"Fetching diary entries for {username}")
+    if not init_mongo():
+        raise Exception("Failed to connect to MongoDB")
     try:
         entries = list(diary_collection.find({"username": username}))
-        logger.info(f"Found {len(entries)} diary entries for {username}")
+        logger.info(f"Fetched {len(entries)} diary entries for {username}")
         return entries
     except Exception as e:
         logger.error(f"Failed to fetch diary entries for {username}: {e}")
         raise
 
 def store_skin_analysis(username, skin_type, skin_info, image_url=None, description=None):
-    init_mongo()
-    logger.info(f"Storing skin analysis for {username}")
+    if not init_mongo():
+        raise Exception("Failed to connect to MongoDB")
     try:
         doc = {
             "username": username,
@@ -137,26 +121,25 @@ def store_skin_analysis(username, skin_type, skin_info, image_url=None, descript
             "description": description
         }
         result = skin_analysis_collection.insert_one(doc)
-        logger.info(f"Skin analysis stored for {username}, ID: {result.inserted_id}")
+        logger.info(f"Skin analysis stored for {username}")
         return result
     except Exception as e:
         logger.error(f"Failed to store skin analysis for {username}: {e}")
         raise
 
 def update_user_by_email(email: str, update_data: dict):
-    init_mongo()
-    logger.info(f"Updating user by email: {email}")
+    if not init_mongo():
+        raise Exception("Failed to connect to MongoDB")
     try:
         user = get_user_by_email(email)
         if user:
             result = users_collection.update_one({"email": email}, {"$set": update_data})
-            logger.info(f"User updated by email: {email}, matched: {result.matched_count}, modified: {result.modified_count}")
+            logger.info(f"User updated by email: {email}")
             return True
-        else:
-            logger.info(f"No user found to update for email: {email}")
-            return False
+        logger.info(f"No user found to update for email: {email}")
+        return False
     except Exception as e:
         logger.error(f"Failed to update user by email {email}: {e}")
         raise
 
-logger.info("MongoDB utilities module loaded (lazy initialization)")
+logger.info("MongoDB utilities loaded")
