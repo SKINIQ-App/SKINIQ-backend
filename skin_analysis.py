@@ -27,6 +27,7 @@ class SkinAnalysisResponse(BaseModel):
 
 @skin_router.post("/analyze")
 async def analyze_skin(username: str = Query(...), file: UploadFile = File(...)):
+    logger.info(f"Received skin analysis request for username: {username}, file: {file.filename}")
     try:
         # Validate username
         if not username or username.strip() == "":
@@ -38,13 +39,24 @@ async def analyze_skin(username: str = Query(...), file: UploadFile = File(...))
             logger.warning("No file provided for skin analysis")
             raise HTTPException(status_code=400, detail="No file provided")
 
+        # Check file content
+        content = await file.read()
+        if not content:
+            logger.warning("Empty file provided for skin analysis")
+            raise HTTPException(status_code=400, detail="File is empty")
+        file.file.seek(0)  # Reset file pointer after reading
+
         user = get_user_by_username(username)
         if not user:
             logger.warning(f"User not found: {username}")
             raise HTTPException(status_code=404, detail="User not found")
 
         # Predict skin type from image
-        skin_type = predict_skin_type(file.file)
+        try:
+            skin_type = predict_skin_type(file.file)
+        except Exception as e:
+            logger.error(f"Failed to predict skin type for {username}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Skin type prediction failed: {str(e)}")
         
         # Fallback routine if prediction fails
         routine = ["Use gentle cleanser and moisturizer daily"]
