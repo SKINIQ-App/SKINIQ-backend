@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 import logging
 import os
 
@@ -21,6 +21,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Suppress favicon request errors
+@app.get("/favicon.ico")
+async def get_favicon():
+    # Return 204 No Content to avoid 404 errors in logs
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 try:
     from auth import auth_router

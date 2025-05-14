@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
 from typing import Optional, List
 from mongo_utils import update_user_by_username, get_user_by_username, store_skin_analysis
@@ -26,8 +26,18 @@ class SkinAnalysisResponse(BaseModel):
     routine: List[str]
 
 @skin_router.post("/analyze")
-async def analyze_skin(username: str, file: UploadFile = File(...)):
+async def analyze_skin(username: str = Query(...), file: UploadFile = File(...)):
     try:
+        # Validate username
+        if not username or username.strip() == "":
+            logger.warning("Invalid username provided for skin analysis")
+            raise HTTPException(status_code=400, detail="Username is required")
+
+        # Validate file
+        if not file.filename:
+            logger.warning("No file provided for skin analysis")
+            raise HTTPException(status_code=400, detail="No file provided")
+
         user = get_user_by_username(username)
         if not user:
             logger.warning(f"User not found: {username}")
@@ -56,9 +66,12 @@ async def analyze_skin(username: str, file: UploadFile = File(...)):
             skin_issues=skin_issues,
             routine=routine
         )
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"Skin analysis failed for {username}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Skin analysis failed: {str(e)}")
+
 @skin_router.post("/questionnaire")
 async def process_questionnaire(details: SkinDetails):
     try:
